@@ -104,7 +104,7 @@ export function parseX28Email(emailText: string): ParsedEvent {
     const addressMatch = emailText.match(/Calle:\s*(.*?)(?:Localidad:|$)/i);
     if (addressMatch && result.technicalOrder) result.technicalOrder.address = addressMatch[1].trim();
     
-    const obsMatch = emailText.match(/Observaciones:\s*(.*?)(?:Acciones:|$)/is);
+    const obsMatch = emailText.match(/Observaciones:\s*([\s\S]*?)(?:Acciones:|$)/i);
     if (obsMatch && result.technicalOrder) result.technicalOrder.observations = obsMatch[1].trim().replace(/\n/g, ' ');
 
     const warrantyMatch = emailText.match(/garantia:\s*(.*?)(?:\(|CON GARANTIA|SIN GARANTIA)/i);
