@@ -19,9 +19,23 @@ export async function POST(req: Request) {
     }
     const agentId = agent.id;
 
-    // 1. Usar el "cerebro" para parsear texto
-    const body = await req.text();
-    const rawText = body || "";
+    // 1. Manejar tanto texto plano directo (Raw POST) como JSON (De Zapier/Make)
+    let rawText = "";
+    const contentType = req.headers.get("content-type") || "";
+    const rawBody = await req.text();
+
+    if (contentType.includes("application/json")) {
+      try {
+        const jsonBody = JSON.parse(rawBody);
+        // Dependiendo de Zapier o SendGrid Inbound Parse, el texto viaja en distintos campos
+        rawText = jsonBody.body_plain || jsonBody.body || jsonBody.text || jsonBody.content || rawBody;
+      } catch (e) {
+        rawText = rawBody; // Fallback
+      }
+    } else {
+      rawText = rawBody;
+    }
+
     const parsed = parseX28Email(rawText);
 
     if (parsed.type === "DESCONOCIDO") {
