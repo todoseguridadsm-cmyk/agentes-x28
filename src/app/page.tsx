@@ -56,7 +56,12 @@ export default async function Home() {
         customerName: item.customers?.full_name || "Desconocido",
         account: item.account_number || item.customers?.account_number || "S/D",
         description: isEvent ? item.description : item.observations || "Alta Pendiente",
-        date: new Date(item.created_at).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
+
+        date: new Date(item.created_at).toLocaleString('es-AR', { 
+            timeZone: 'America/Argentina/Buenos_Aires',
+            hour12: false 
+        }),
+
         status: item.status,
         details: item
      };

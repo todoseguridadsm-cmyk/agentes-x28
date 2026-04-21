@@ -35,6 +35,7 @@ export async function POST(req: Request) {
         const emailId = jsonBody?.data?.email_id || jsonBody?.email_id;
         if (!rawText && emailId) {
           console.log("Cuerpo vacío en webhook, intentando recuperar email_id:", emailId);
+
           const res = await fetch(`https://api.resend.com/emails/${emailId}`, {
             headers: {
               'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
@@ -43,7 +44,13 @@ export async function POST(req: Request) {
           if (res.ok) {
             const fullEmail = await res.json();
             rawText = fullEmail.text || fullEmail.html || "";
+          } else {
+            const errorData = await res.text();
+            console.error(`Resend API Error (${res.status}):`, errorData);
+            // Si falló la API, guardamos el error en rawText para verlo en el dashboard
+            rawText = `ERROR_RESEND_API_${res.status}: ${errorData}`;
           }
+
         }
 
         // Si sigue sin haber texto, volcamos todo el JSON para debug
