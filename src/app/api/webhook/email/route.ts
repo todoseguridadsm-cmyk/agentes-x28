@@ -27,8 +27,8 @@ export async function POST(req: Request) {
     if (contentType.includes("application/json")) {
       try {
         const jsonBody = JSON.parse(rawBody);
-        // Dependiendo de Zapier o SendGrid Inbound Parse, el texto viaja en distintos campos
-        rawText = jsonBody.body_plain || jsonBody.body || jsonBody.text || jsonBody.content || jsonBody.raw;
+        // Dependiendo de Zapier o Resend Inbound Parse, el texto viaja en distintos campos
+        rawText = jsonBody?.data?.text || jsonBody?.data?.html || jsonBody.body_plain || jsonBody.body || jsonBody.text || jsonBody.content || jsonBody.raw;
         
         // Si no encontró las claves típicas, volcamos todo a un string para ver si el parser lo encuentra
         if (!rawText && typeof jsonBody === 'object') {
@@ -51,7 +51,14 @@ export async function POST(req: Request) {
     const parsed = parseX28Email(rawText);
 
     if (parsed.type === "DESCONOCIDO") {
-       return NextResponse.json({ success: true, message: "Ignorado temporalmente" });
+       await supabase.from('events').insert({
+          agent_id: agentId,
+          event_type: "FORMATO_DESCONOCIDO",
+          priority: "GRIS",
+          description: "No se pudo parsear el formato de Resend.",
+          raw_email_text: rawText.substring(0, 1500)
+       });
+       return NextResponse.json({ success: true, message: "Guardado como desconocido para debug." });
     }
 
     // 2. Manejo de Cliente: Buscar o Crear atado al Agente
