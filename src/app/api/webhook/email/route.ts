@@ -51,14 +51,10 @@ export async function POST(req: Request) {
     const parsed = parseX28Email(rawText);
 
     if (parsed.type === "DESCONOCIDO") {
-       await supabase.from('events').insert({
-          agent_id: agentId,
-          event_type: "FORMATO_DESCONOCIDO",
-          priority: "GRIS",
-          description: "No pasó el parser. Texto guardado para análisis.",
-          raw_email_text: rawText || "TEXTO RECIBIDO VACÍO O NULO"
-       });
-       return NextResponse.json({ success: true, message: "Aceptado pero no parseado correctamente. Se guardó para debug." });
+       // LO DESCARTAMOS SILENCIOSAMENTE.
+       // Retornamos 200 success para que Zapier NO pause el Zap pensando que es un error, 
+       // pero no insertamos nada en la base de datos para no ensuciar la app.
+       return NextResponse.json({ success: true, message: "Ignorado: El formato no pertenece a cuidar@x-28" });
     }
 
     // 2. Manejo de Cliente: Buscar o Crear atado al Agente
