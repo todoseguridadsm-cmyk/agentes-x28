@@ -29,14 +29,19 @@ export function parseX28Email(emailText: string): ParsedEvent {
     rawText: emailText,
   };
 
+  // Limpieza inicial: quitamos etiquetas HTML en caso de que Zapier mande body_html por error.
+  const cleanText = emailText.replace(/<[^>]+>/g, ' ');
+  // Texto normalizado: minúsculas y sin tildes para búsqueda flexible
+  const normalizedText = cleanText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   // 1. FORMATO: SEÑAL NO RECIBIDA
-  if (emailText.includes("Señal No Recibida")) {
+  if (normalizedText.includes("senal no recibida")) {
     result.type = "SEÑAL_NO_RECIBIDA";
     result.priority = "AMARILLO";
     
-    // Ejemplo: "En cuenta 729C - MONDELLO SRL - GPRS se ha generado una Señal No Recibida a las 20:30:00 del dia 2026-04-19."
-    const regexAccount = /En cuenta\s+([A-Z0-9\-]+)\s*-\s*(.*?)\s*-\s*GPRS/i;
-    const match = emailText.match(regexAccount);
+    // Usamos el cleanText por si venía con HTML
+    const regexAccount = /En cuenta\s+([A-Za-z0-9\-]+)\s*-\s*(.*?)\s*-\s*GPRS/i;
+    const match = cleanText.match(regexAccount);
     if (match) {
       result.account = match[1].trim();
       result.name = match[2].trim();
@@ -45,35 +50,32 @@ export function parseX28Email(emailText: string): ParsedEvent {
   }
 
   // 2. FORMATO: REPORTE HISTÓRICO DE EVENTOS
-  if (emailText.includes("Reporte histórico de eventos")) {
+  if (normalizedText.includes("reporte historico de eventos") || normalizedText.includes("historico de eventos")) {
     result.type = "REPORTE_EVENTOS";
-    result.priority = "ROJO"; // Asumimos rojo porque agrupa robos, se puede afinar
+    result.priority = "ROJO";
     
-    // Ejemplo de línea base cuenta: "BRN-FE57 OCHOA, GABRIELA BEATRIZ - GPRS"
-    // Buscamos patrones de Cuenta + Nombre
-    const regexAccount = /([A-Z0-9\-]{4,8})\s+([^\\n]+?)\s*-\s*GPRS/i;
-    const match = emailText.match(regexAccount);
+    const regexAccount = /([A-Za-z0-9\-]{4,8})\s+([^\\n]+?)\s*-\s*GPRS/i;
+    const match = cleanText.match(regexAccount);
     if (match) {
       result.account = match[1].trim();
       result.name = match[2].trim();
     }
 
-    // Extracción de eventos múltiples
     result.events = [];
-    const eventRegex = /(\d{2}-\d{2}-\d{4}\s\d{2}:\d{2}:\d{2})(.*?)Robo\(\d+\)\s([^\n]+)/g;
+    const eventRegex = /(\d{2}-\d{2}-\d{4}\s\d{2}:\d{2}:\d{2})(.*?)Robo\(\d+\)\s([^\n]+)/ig;
     let evMatch;
-    while ((evMatch = eventRegex.exec(emailText)) !== null) {
+    while ((evMatch = eventRegex.exec(cleanText)) !== null) {
       result.events.push({
         date: evMatch[1].trim(),
         description: "Robo detectado",
-        zone: evMatch[3].trim()
+        zone: evMatch[3].trim().substring(0, 50)
       });
     }
     return result;
   }
 
   // 3. FORMATO: HOJA DE SERVICIO TECNICO
-  if (emailText.includes("HOJA DE SERVICIO TECNICO")) {
+  if (normalizedText.includes("hoja de servicio tecnico") || normalizedText.includes("servicio tecnico")) {
     result.type = "SERVICIO_TECNICO";
     result.priority = "AZUL";
     result.technicalOrder = {
@@ -85,29 +87,29 @@ export function parseX28Email(emailText: string): ParsedEvent {
       warranty: null
     };
 
-    // Extraer Cuenta y Nombre (Ej: "Cuenta N: BRN 0D02 Nombre: PERSIA GIMENA - WIFI")
-    const accountMatch = emailText.match(/Cuenta\s*N:\s*([A-Z0-9\-\s]+?)\s*Nombre:\s*(.*?)(?:- WIFI|- GPRS|Estado de)/i);
+    const accountMatch = cleanText.match(/Cuenta\s*N:\s*([A-Za-z0-9\-\s]+?)\s*Nombre:\s*(.*?)(?:- WIFI|- GPRS|Estado de)/i);
     if (accountMatch) {
-      result.account = accountMatch[1].replace(/\s+/g, '').trim(); // Dejar "BRN0D02"
+      result.account = accountMatch[1].replace(/\s+/g, '').trim(); 
       result.name = accountMatch[2].trim();
     }
 
-    const orderMatch = emailText.match(/Orden\s*N:\s*(\d+)/i);
+    const orderMatch = cleanText.match(/Orden\s*N:\s*(\d+)/i);
     if (orderMatch && result.technicalOrder) result.technicalOrder.orderNumber = orderMatch[1];
 
-    const modelMatch = emailText.match(/Panel Modelo:\s*(.*?)(?:Fecha|Versi(?:ó|o)n)/i);
+    const modelMatch = cleanText.match(/Panel Modelo:\s*(.*?)(?:Fecha|Versi(?:ó|o)n)/i);
     if (modelMatch && result.technicalOrder) result.technicalOrder.panelModel = modelMatch[1].trim();
 
-    const phoneMatch = emailText.match(/Tel(?:ó|e)fono:\s*([0-9\-\s]+)/i);
+    const phoneMatch = cleanText.match(/Tel(?:ó|e)fono:\s*([0-9\-\s]+)/i);
     if (phoneMatch && result.technicalOrder) result.technicalOrder.phone = phoneMatch[1].trim();
 
-    const addressMatch = emailText.match(/Calle:\s*(.*?)(?:Localidad:|$)/i);
+    const addressMatch = cleanText.match(/Calle:\s*(.*?)(?:Localidad:|$)/i);
     if (addressMatch && result.technicalOrder) result.technicalOrder.address = addressMatch[1].trim();
     
-    const obsMatch = emailText.match(/Observaciones:\s*([\s\S]*?)(?:Acciones:|$)/i);
+    // Tratamos de buscar la parte de las observaciones
+    const obsMatch = cleanText.match(/Observaciones:\s*([\s\S]*?)(?:Acciones:|$)/i);
     if (obsMatch && result.technicalOrder) result.technicalOrder.observations = obsMatch[1].trim().replace(/\n/g, ' ');
 
-    const warrantyMatch = emailText.match(/garantia:\s*(.*?)(?:\(|CON GARANTIA|SIN GARANTIA)/i);
+    const warrantyMatch = cleanText.match(/garantia:\s*(.*?)(?:\(|CON GARANTIA|SIN GARANTIA)/i);
     if (warrantyMatch && result.technicalOrder) result.technicalOrder.warranty = warrantyMatch[1].trim();
 
     return result;
