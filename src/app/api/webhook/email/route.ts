@@ -51,13 +51,6 @@ export async function POST(req: Request) {
     const parsed = parseX28Email(rawText);
 
     if (parsed.type === "DESCONOCIDO") {
-       await supabase.from('events').insert({
-          agent_id: agentId,
-          event_type: "FORMATO_DESCONOCIDO",
-          priority: "GRIS",
-          description: "No pasó el parser. Texto guardado para análisis.",
-          raw_email_text: rawText || "TEXTO RECIBIDO VACÍO O NULO"
-       });
        return NextResponse.json({ success: true, message: "Ignorado temporalmente" });
     }
 
