@@ -24,20 +24,37 @@ export async function POST(req: Request) {
     const contentType = req.headers.get("content-type") || "";
     const rawBody = await req.text();
 
+
     if (contentType.includes("application/json")) {
       try {
         const jsonBody = JSON.parse(rawBody);
-        // Dependiendo de Zapier o Resend Inbound Parse, el texto viaja en distintos campos
+        // Intentar sacar el texto directo de los campos comunes
         rawText = jsonBody?.data?.text || jsonBody?.data?.html || jsonBody.body_plain || jsonBody.body || jsonBody.text || jsonBody.content || jsonBody.raw;
         
-        // Si no encontró las claves típicas, volcamos todo a un string para ver si el parser lo encuentra
+        // --- NUEVA LÓGICA: Si no hay cuerpo pero hay un email_id, lo buscamos en la API de Resend ---
+        const emailId = jsonBody?.data?.email_id || jsonBody?.email_id;
+        if (!rawText && emailId) {
+          console.log("Cuerpo vacío en webhook, intentando recuperar email_id:", emailId);
+          const res = await fetch(`https://api.resend.com/emails/${emailId}`, {
+            headers: {
+              'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+            }
+          });
+          if (res.ok) {
+            const fullEmail = await res.json();
+            rawText = fullEmail.text || fullEmail.html || "";
+          }
+        }
+
+        // Si sigue sin haber texto, volcamos todo el JSON para debug
         if (!rawText && typeof jsonBody === 'object') {
            rawText = JSON.stringify(jsonBody); 
         }
       } catch (e) {
-        rawText = rawBody; // Fallback
+        rawText = rawBody;
       }
     } else if (contentType.includes("application/x-www-form-urlencoded")) {
+
       try {
          const searchParams = new URLSearchParams(rawBody);
          rawText = searchParams.get('body_plain') || searchParams.get('body') || searchParams.get('text') || searchParams.get('raw') || decodeURIComponent(rawBody);
@@ -48,85 +65,132 @@ export async function POST(req: Request) {
       rawText = rawBody;
     }
 
+
     const parsed = parseX28Email(rawText);
 
+
     if (parsed.type === "DESCONOCIDO") {
+       // Intentar extraer quién envió el mail para el debug
+       let sender = "Desconocido";
+       try {
+         const json = JSON.parse(rawBody);
+         sender = json?.data?.from || json?.from || "Desconocido";
+       } catch(e) {}
+
        await supabase.from('events').insert({
           agent_id: agentId,
           event_type: "FORMATO_DESCONOCIDO",
           priority: "GRIS",
-          description: "No se pudo parsear el formato de Resend.",
+          description: `Formato no reconocido. Enviado por: ${sender}`,
           raw_email_text: rawText.substring(0, 1500)
        });
        return NextResponse.json({ success: true, message: "Guardado como desconocido para debug." });
     }
 
-    // 2. Manejo de Cliente: Buscar o Crear atado al Agente
-    let customerId = null;
-    if (parsed.account) {
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('account_number', parsed.account)
-        .eq('agent_id', agentId)
-        .single();
-      
-      if (customer) {
-         customerId = customer.id;
-      } else {
-         const { data: newCustomer } = await supabase
-           .from('customers')
-           .insert({ 
-               agent_id: agentId,
-               account_number: parsed.account, 
-               full_name: parsed.name,
-               phone: parsed.technicalOrder?.phone,
-               address: parsed.technicalOrder?.address,
-               panel_model: parsed.technicalOrder?.panelModel
-           })
-           .select('id')
-           .single();
-           
-         customerId = newCustomer?.id;
-      }
+
+    // 2. Procesar Eventos (pueden ser uno o muchos)
+    const eventsToProcess = [];
+
+    if (parsed.type === "MULTIPLE_EVENTS" && parsed.events) {
+        eventsToProcess.push(...parsed.events);
+    } else if (parsed.type === "REPORTE_EVENTOS" && parsed.events) {
+        eventsToProcess.push(...parsed.events);
+    } else if (parsed.type === "SEÑAL_NO_RECIBIDA") {
+        eventsToProcess.push({
+            account: parsed.account,
+            name: parsed.name,
+            date: new Date().toISOString(),
+            description: "Se ha generado una Señal No Recibida.",
+            priority: "AMARILLO" as const,
+            eventType: "FALLO_SEÑAL",
+            zone: ""
+        });
     }
 
-    // 3. Insertar dependendiendo del tipo (atado al Agente)
-    if (parsed.type === "SEÑAL_NO_RECIBIDA") {
-       await supabase.from('events').insert({
-          agent_id: agentId,
-          customer_id: customerId,
-          account_number: parsed.account,
-          event_type: "FALLO_SEÑAL",
-          priority: "AMARILLO",
-          description: "GPRS se ha generado una Señal No Recibida.",
-          raw_email_text: rawText
-       });
+    // Procesar cada evento encontrado
+    for (const ev of eventsToProcess) {
+        let customerId = null;
+        const accountNum = ev.account || parsed.account;
+        const customerName = ev.name || parsed.name;
+
+        if (accountNum) {
+            // Buscar o Crear Cliente
+            const { data: customer } = await supabase
+                .from('customers')
+                .select('id')
+                .eq('account_number', accountNum)
+                .eq('agent_id', agentId)
+                .single();
+            
+            if (customer) {
+                customerId = customer.id;
+            } else {
+                const { data: newCustomer } = await supabase
+                    .from('customers')
+                    .insert({ 
+                        agent_id: agentId,
+                        account_number: accountNum, 
+                        full_name: customerName || "Cliente Desconocido",
+                    })
+                    .select('id')
+                    .single();
+                
+                customerId = newCustomer?.id;
+            }
+        }
+
+        // Insertar en la tabla de eventos
+        await supabase.from('events').insert({
+            agent_id: agentId,
+            customer_id: customerId,
+            account_number: accountNum,
+            event_type: ev.eventType || (ev.priority === "ROJO" ? "ALERTA_ROBO" : "FALLO_SEÑAL"),
+            priority: ev.priority || "AMARILLO",
+            description: `${ev.description} ${ev.zone ? `(Zona: ${ev.zone})` : ""}`.trim(),
+            raw_email_text: rawText
+        });
     }
 
-    if (parsed.type === "REPORTE_EVENTOS" && parsed.events) {
-       const eventsToInsert = parsed.events.map(ev => ({
-          agent_id: agentId,
-          customer_id: customerId,
-          account_number: parsed.account,
-          event_type: "ALERTA_ROBO",
-          priority: "ROJO",
-          description: `${ev.description} en zona: ${ev.zone}. Fecha: ${ev.date}`,
-          raw_email_text: rawText
-       }));
-       await supabase.from('events').insert(eventsToInsert);
-    }
-
+    // 3. Manejo especial de Servicio Técnico
     if (parsed.type === "SERVICIO_TECNICO" && parsed.technicalOrder) {
-       await supabase.from('technical_orders').insert({
-          agent_id: agentId,
-          customer_id: customerId,
-          priority: "AZUL",
-          observations: parsed.technicalOrder.observations
-       });
+        let customerId = null;
+        if (parsed.account) {
+            const { data: customer } = await supabase
+                .from('customers')
+                .select('id')
+                .eq('account_number', parsed.account)
+                .eq('agent_id', agentId)
+                .single();
+            
+            if (customer) {
+                customerId = customer.id;
+            } else {
+                const { data: newCustomer } = await supabase
+                    .from('customers')
+                    .insert({ 
+                        agent_id: agentId,
+                        account_number: parsed.account, 
+                        full_name: parsed.name,
+                        phone: parsed.technicalOrder?.phone,
+                        address: parsed.technicalOrder?.address,
+                        panel_model: parsed.technicalOrder?.panelModel
+                    })
+                    .select('id')
+                    .single();
+                customerId = newCustomer?.id;
+            }
+        }
+
+        await supabase.from('technical_orders').insert({
+            agent_id: agentId,
+            customer_id: customerId,
+            priority: "AZUL",
+            observations: parsed.technicalOrder.observations
+        });
     }
 
-    return NextResponse.json({ success: true, message: "Evento procesado y asignado al Agente!" });
+    return NextResponse.json({ success: true, message: "Emails procesados correctamente." });
+
 
   } catch (error: any) {
     console.error("Webhook Error", error);

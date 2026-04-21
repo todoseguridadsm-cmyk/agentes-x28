@@ -49,16 +49,18 @@ export default async function Home() {
 
   allFeedItems.forEach(item => {
      const isEvent = item.event_type !== undefined;
+
      const parsedItem = {
         id: item.id,
         type: item.priority as "ROJO" | "AMARILLO" | "AZUL",
         customerName: item.customers?.full_name || "Desconocido",
         account: item.account_number || item.customers?.account_number || "S/D",
         description: isEvent ? item.description : item.observations || "Alta Pendiente",
-        date: new Date(item.created_at).toLocaleString('es-AR'),
+        date: new Date(item.created_at).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' }),
         status: item.status,
         details: item
      };
+
 
      if (parsedItem.type === "ROJO") rojoItems.push(parsedItem);
      else if (parsedItem.type === "AMARILLO") amarilloItems.push(parsedItem);
