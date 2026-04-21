@@ -28,9 +28,21 @@ export async function POST(req: Request) {
       try {
         const jsonBody = JSON.parse(rawBody);
         // Dependiendo de Zapier o SendGrid Inbound Parse, el texto viaja en distintos campos
-        rawText = jsonBody.body_plain || jsonBody.body || jsonBody.text || jsonBody.content || rawBody;
+        rawText = jsonBody.body_plain || jsonBody.body || jsonBody.text || jsonBody.content || jsonBody.raw;
+        
+        // Si no encontró las claves típicas, volcamos todo a un string para ver si el parser lo encuentra
+        if (!rawText && typeof jsonBody === 'object') {
+           rawText = JSON.stringify(jsonBody); 
+        }
       } catch (e) {
         rawText = rawBody; // Fallback
+      }
+    } else if (contentType.includes("application/x-www-form-urlencoded")) {
+      try {
+         const searchParams = new URLSearchParams(rawBody);
+         rawText = searchParams.get('body_plain') || searchParams.get('body') || searchParams.get('text') || searchParams.get('raw') || decodeURIComponent(rawBody);
+      } catch(e) {
+         rawText = decodeURIComponent(rawBody);
       }
     } else {
       rawText = rawBody;
@@ -39,7 +51,10 @@ export async function POST(req: Request) {
     const parsed = parseX28Email(rawText);
 
     if (parsed.type === "DESCONOCIDO") {
-      return NextResponse.json({ message: "Formato no detectado", parsed }, { status: 400 });
+      return NextResponse.json({ 
+        error: "Formato no detectado. Si estás probando desde Zapier, asegurate de enviar un mail real de X-28 y de mapear el campo 'body_plain' o 'body'.", 
+        textoRecibido: rawText.substring(0, 500) // Devolvemos un extracto para que lo vean en Zapier
+      }, { status: 400 });
     }
 
     // 2. Manejo de Cliente: Buscar o Crear atado al Agente
