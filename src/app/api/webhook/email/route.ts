@@ -76,6 +76,7 @@ export async function POST(req: Request) {
     const parsed = parseX28Email(rawText);
 
 
+
     if (parsed.type === "DESCONOCIDO") {
        // Intentar extraer quién envió el mail para el debug
        let sender = "Desconocido";
@@ -89,10 +90,11 @@ export async function POST(req: Request) {
           event_type: "FORMATO_DESCONOCIDO",
           priority: "GRIS",
           description: `Formato no reconocido. Enviado por: ${sender}`,
-          raw_email_text: rawText.substring(0, 1500)
+          raw_email_text: rawBody // GUARDAMOS TODO EL BODY PARA VER QUÉ MANDA RESEND REALMENTE
        });
        return NextResponse.json({ success: true, message: "Guardado como desconocido para debug." });
     }
+
 
 
     // 2. Procesar Eventos (pueden ser uno o muchos)
