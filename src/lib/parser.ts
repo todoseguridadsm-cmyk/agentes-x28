@@ -62,7 +62,8 @@ export function parseX28Email(emailText: string): ParsedEvent {
     }
 
     result.events = [];
-    const eventRegex = /(\d{2}-\d{2}-\d{4}\s\d{2}:\d{2}:\d{2})(.*?)Robo\(\d+\)\s([^\n]+)/ig;
+    // Hacemos el patrón (Robo) mucho más tolerante a espacios/tabs que Zapier pueda inyectar.
+    const eventRegex = /(\d{2}-\d{2}-\d{4}\s\d{2}:\d{2}:\d{2})(.*?)Robo[\s\t]*(?:\(\d+\))?[\s\t]*([^\n]+)/ig;
     let evMatch;
     while ((evMatch = eventRegex.exec(cleanText)) !== null) {
       result.events.push({
