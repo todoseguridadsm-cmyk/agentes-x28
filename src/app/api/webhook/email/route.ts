@@ -51,10 +51,15 @@ export async function POST(req: Request) {
     const parsed = parseX28Email(rawText);
 
     if (parsed.type === "DESCONOCIDO") {
-      return NextResponse.json({ 
-        error: "Formato no detectado. Si estás probando desde Zapier, asegurate de enviar un mail real de X-28 y de mapear el campo 'body_plain' o 'body'.", 
-        textoRecibido: rawText.substring(0, 500) // Devolvemos un extracto para que lo vean en Zapier
-      }, { status: 400 });
+       // GUARDAMOS TEMPORALMENTE EL ERROR EN LA BD PARA PODER REVISARLO
+       await supabase.from('events').insert({
+          agent_id: agentId,
+          event_type: "RECHAZADO_MALA_ESTRUCTURA",
+          priority: "AMARILLO",
+          description: "Fallo de parseo de Zapier. Evento Desconocido.",
+          raw_email_text: rawText
+       });
+       return NextResponse.json({ success: true, message: "Aceptado para debug. Revisa tu BD." });
     }
 
     // 2. Manejo de Cliente: Buscar o Crear atado al Agente
