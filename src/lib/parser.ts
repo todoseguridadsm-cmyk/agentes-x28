@@ -1,23 +1,27 @@
+
 /**
  * X-28 Agent Core - Parseador de Mails
  * Transforma los correos de texto plano de cuidar@x-28.com a objetos estructurados.
  */
 
+export type Priority = "ROJO" | "AMARILLO" | "AZUL" | "GRIS";
+
+export interface X28Event {
+  date: string;
+  description: string;
+  zone?: string;
+  priority: Priority;
+  eventType: string;
+  account?: string | null;
+  name?: string | null;
+}
 
 export interface ParsedEvent {
   type: "SEÑAL_NO_RECIBIDA" | "REPORTE_EVENTOS" | "SERVICIO_TECNICO" | "MULTIPLE_EVENTS" | "DESCONOCIDO";
-  priority: "ROJO" | "AMARILLO" | "AZUL" | "GRIS";
+  priority: Priority;
   account: string | null;
   name: string | null;
-  events?: { 
-    date: string; 
-    description: string; 
-    zone: string; 
-    account?: string | null;
-    name?: string | null;
-    priority?: "ROJO" | "AMARILLO" | "AZUL";
-    eventType?: string;
-  }[];
+  events?: X28Event[];
   technicalOrder?: {
     orderNumber: string | null;
     panelModel: string | null;
@@ -42,20 +46,19 @@ export function parseX28Email(emailText: string): ParsedEvent {
   const normalizedText = cleanText.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   // Helper para clasificar eventos
-  const classify = (desc: string) => {
+  const classify = (desc: string): { priority: Priority, type: string } => {
     const d = desc.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (d.includes("robo") || d.includes("disparo") || d.includes("alarma")) {
-      return { priority: "ROJO" as const, type: "ALERTA_ROBO" };
+      return { priority: "ROJO", type: "ALERTA_ROBO" };
     }
 
     if (d.includes("test manual")) {
-      return { priority: "GRIS" as const, type: "TEST_MANUAL" };
+      return { priority: "GRIS", type: "TEST_MANUAL" };
     }
     if (d.includes("senal no recibida") || d.includes("keep alive") || d.includes("comunicacion") || d.includes("perdida de") || d.includes("fallo")) {
-      return { priority: "AMARILLO" as const, type: "FALLO_COMUNICACION" };
+      return { priority: "AMARILLO", type: "FALLO_COMUNICACION" };
     }
-    return { priority: "AZUL" as const, type: "NORMAL" };
-
+    return { priority: "AZUL", type: "NORMAL" };
   };
 
   // 1. FORMATO: BRN-XXXX (Bulk / Masivo)
@@ -63,21 +66,14 @@ export function parseX28Email(emailText: string): ParsedEvent {
     result.type = "MULTIPLE_EVENTS";
     result.events = [];
     
-    // Dividimos por cada bloque que empieza con BRN-
     const blocks = cleanText.split(/(?=BRN-[A-Z0-9]{4})/);
-    
     for (const block of blocks) {
       if (!block.trim()) continue;
       
-      // Extraer Cuenta y Nombre de la cabecera del bloque
-      // Formato: BRN-53F0 PROVIDUS S.A. - GPRS
       const headerMatch = block.match(/BRN-([A-Z0-9]+)\s+([^-]+?)\s*-\s*(GPRS|WIFI|IPR|NAIR)/i);
       const account = headerMatch ? headerMatch[1].trim() : null;
       const name = headerMatch ? headerMatch[2].trim() : null;
 
-
-
-      // Buscar líneas de eventos dentro del bloque
       const blockLines = block.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       for (let i = 0; i < blockLines.length; i++) {
         const line = blockLines[i];
@@ -87,28 +83,22 @@ export function parseX28Email(emailText: string): ParsedEvent {
           const date = dateMatch[1];
           let eventDescription = "";
           let eventZone = "";
-          let eventName = name; // Por defecto usamos el del bloque
+          let eventName = name;
 
-          // Opción 1: Todo en la misma línea (separado por tabs o muchos espacios)
           const parts = line.split(/[\t]{1,}|[\s]{2,}/).map(p => p.trim()).filter(p => p.length > 0);
           if (parts.length >= 3) {
             eventDescription = parts[2];
             eventZone = parts[3] || "";
-          } 
-          // Opción 2: Multi-línea (Outlook style)
-          else {
-            // El nombre suele estar en la siguiente línea
+          } else {
             if (blockLines[i+1] && !blockLines[i+1].match(/^\d{2}-\d{2}-\d{4}/)) {
               eventName = blockLines[i+1];
-              // El evento en la siguiente
               if (blockLines[i+2]) {
                 eventDescription = blockLines[i+2];
-                // Y la zona en la que sigue si empieza con paréntesis
                 if (blockLines[i+3] && blockLines[i+3].startsWith('(')) {
                   eventZone = blockLines[i+3];
-                  i += 3; // Saltamos 3 líneas
+                  i += 3;
                 } else {
-                  i += 2; // Saltamos 2 líneas
+                  i += 2;
                 }
               }
             }
@@ -128,13 +118,9 @@ export function parseX28Email(emailText: string): ParsedEvent {
           }
         }
       }
-
-
     }
-
     if (result.events.length > 0) {
-      // Si todos son del mismo tipo, podríamos heredar la prioridad al objeto principal
-      result.priority = result.events[0].priority || "GRIS";
+      result.priority = result.events[0].priority;
       return result;
     }
   }
@@ -149,13 +135,6 @@ export function parseX28Email(emailText: string): ParsedEvent {
     if (match) {
       result.account = match[1].trim();
       result.name = match[2].trim();
-    } else {
-        // Fallback si no dice "En cuenta"
-        const altMatch = cleanText.match(/cuenta\s+([A-Za-z0-9\-]+)\s+-\s+([^\-]+?)\s+-\s+/i);
-        if (altMatch) {
-            result.account = altMatch[1].trim();
-            result.name = altMatch[2].trim();
-        }
     }
     return result;
   }
@@ -202,23 +181,16 @@ export function parseX28Email(emailText: string): ParsedEvent {
       warranty: null
     };
 
-
     const accountMatch = cleanText.match(/Cuenta\s*N:\s*([A-Za-z0-9\-\s]+?)\s*Nombre:\s*(.*?)(?:- WIFI|- GPRS|Estado de|\n)/i);
     if (accountMatch) {
       result.account = accountMatch[1].replace(/\s+/g, '').trim(); 
       result.name = accountMatch[2].trim();
     }
 
-
-    // Extraer datos de contacto
     const addressMatch = cleanText.match(/Domicilio\s*:\s*([^\n\r]+)/i);
     const panelMatch = cleanText.match(/Modelo Panel\s*:\s*([^\n\r]+)/i);
     const obsMatch = cleanText.match(/Observaciones\s*:\s*([\s\S]*?)(?:Garantia|$)/i);
-    
-    // El campo Telef. es el chip del comunicador
     const chipMatch = cleanText.match(/Telef\.\s*:\s*([^\n\r]+)/i);
-    
-    // El celular real está en la línea de Contacto (al final)
     const contactMatch = cleanText.match(/Contacto\s*:\s*(.*?)\s+(\d{7,15})/i);
 
     if (result.technicalOrder) {
@@ -227,8 +199,6 @@ export function parseX28Email(emailText: string): ParsedEvent {
         result.technicalOrder.panelModel = panelMatch ? panelMatch[1].trim() : null;
         result.technicalOrder.observations = obsMatch ? obsMatch[1].trim() : "Solicitud de servicio técnico";
     }
-
-
 
     const orderMatch = cleanText.match(/Orden\s*N:\s*(\d+)/i);
     if (orderMatch && result.technicalOrder) result.technicalOrder.orderNumber = orderMatch[1];
@@ -244,7 +214,5 @@ export function parseX28Email(emailText: string): ParsedEvent {
     return result;
   }
 
-
   return result;
 }
-
