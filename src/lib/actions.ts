@@ -71,12 +71,14 @@ export async function markOrderCompleted(orderId: string) {
 
 export async function deleteOrder(orderId: string) {
   const { error } = await supabase.from("technical_orders").delete().eq("id", orderId);
+  if (error) console.error("Error deleting order:", error);
   return { success: !error, error };
 }
 
 
 export async function deleteEvent(eventId: string) {
   const { error } = await supabase.from("events").delete().eq("id", eventId);
+  if (error) console.error("Error deleting event:", error);
   return { success: !error, error };
 }
 
@@ -87,7 +89,22 @@ export async function deleteEventsByAccount(agentId: string, account: string) {
 }
 
 export async function deleteOrdersByAccount(agentId: string, account: string) {
-  const { error } = await supabase.from("technical_orders").delete().eq("agent_id", agentId).eq("account_number", account);
+  // Primero buscamos al cliente para obtener su ID
+  const { data: customer } = await supabase
+    .from("customers")
+    .select("id")
+    .eq("agent_id", agentId)
+    .eq("account_number", account)
+    .single();
+
+  if (!customer) return { error: "Cliente no encontrado." };
+
+  const { error } = await supabase
+    .from("technical_orders")
+    .delete()
+    .eq("agent_id", agentId)
+    .eq("customer_id", customer.id);
+    
   return { success: !error, error };
 }
 
