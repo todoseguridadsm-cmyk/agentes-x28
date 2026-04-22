@@ -118,14 +118,12 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                            <span className="text-[10px] text-slate-400 uppercase font-bold">{it.date}</span>
                            <button onClick={(e) => !isAzul ? handleDeleteEvent(it.id, e) : handleDeleteOrder(it.id, e)} className="text-red-400/50 hover:text-red-400 transition text-xs">✕</button>
                         </div>
-
                         <p className="text-sm text-slate-200 font-light leading-relaxed">
                            {it.description}
                            {it.details && typeof it.details === 'object' && 'zone' in it.details && (
                              <span className="ml-2 text-slate-400 text-xs italic">({(it.details as any).zone})</span>
                            )}
                         </p>
-
                         
                         {isAzul && !isCompleted && (
                           <div className="mt-3 flex gap-2">
@@ -148,7 +146,6 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
     );
   };
 
-  // --- MODAL DE ALTA ---
   const [isAltaModalOpen, setIsAltaModalOpen] = useState(false);
   const [isSubmittingAlta, setIsSubmittingAlta] = useState(false);
   const [altaError, setAltaError] = useState("");
@@ -182,11 +179,11 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
 
   return (
     <div className="relative z-10 w-full max-w-5xl mx-auto flex flex-col items-center flex-1 pb-16 px-4">
-       <div className="mb-10 flex flex-col items-center">
+       <div className="mb-10 flex flex-col items-center text-center">
          <div className="border border-white/20 bg-white/5 backdrop-blur-md rounded-full px-6 py-2 mb-4 text-sm font-bold tracking-[0.2em] text-slate-200 uppercase">
            AGENTES X-28: {agent.first_name} {agent.last_name}
          </div>
-         <h1 className="text-3xl md:text-5xl font-medium tracking-tight text-center uppercase">
+         <h1 className="text-3xl md:text-5xl font-medium tracking-tight uppercase">
            MONITOREO DE ALARMAS
          </h1>
        </div>
@@ -210,7 +207,7 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                    <h2 className="text-xl font-bold uppercase tracking-widest text-left">Alta de Monitoreo</h2>
                    <button onClick={() => !isSubmittingAlta && setIsAltaModalOpen(false)} className="text-white/50 hover:text-white text-2xl font-light">&times;</button>
                 </div>
-                <form onSubmit={handleAltaSubmit} className="p-6 overflow-y-auto flex flex-col gap-4 text-left">
+                <form onSubmit={handleAltaSubmit} className="p-6 overflow-y-auto flex flex-col gap-4 text-left text-white">
                    {altaSuccess ? (
                       <div className="py-12 flex flex-col items-center justify-center text-center gap-4">
                          <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center border border-green-500">
