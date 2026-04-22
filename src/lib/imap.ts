@@ -28,7 +28,8 @@ export async function fetchAndProcessEmails() {
       const { data: agents } = await supabase.from('agents').select('id, email');
       if (!agents) throw new Error("No se pudieron cargar los agentes.");
 
-      let uids = await client.search({ seen: false });
+
+      let uids = await client.search({ all: true });
       
       for (let uid of uids) {
         let message = await client.fetchOne(uid.toString(), { source: true });
@@ -37,12 +38,22 @@ export async function fetchAndProcessEmails() {
         const parsed = await simpleParser(message.source);
         const bodyText = parsed.text || "";
         const subject = parsed.subject || "";
+        const fromAddress = parsed.from?.value[0]?.address || "";
         
         let targetAgent = null;
         for (const agent of agents) {
-          if (bodyText.includes(agent.email) || subject.includes(agent.email)) {
+          if (fromAddress.toLowerCase() === agent.email.toLowerCase()) {
             targetAgent = agent;
             break;
+          }
+        }
+        
+        if (!targetAgent) {
+          for (const agent of agents) {
+            if (bodyText.includes(agent.email) || subject.includes(agent.email)) {
+              targetAgent = agent;
+              break;
+            }
           }
         }
         
@@ -55,6 +66,7 @@ export async function fetchAndProcessEmails() {
               }
            }
         }
+
 
         if (targetAgent) {
           console.log(`Procesando mail para agente: ${targetAgent.email}`);
