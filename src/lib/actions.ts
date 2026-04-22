@@ -1,6 +1,6 @@
 "use server";
 
-import { supabase } from "./supabase";
+import { supabase, supabaseAdmin } from "./supabase";
 import { cookies } from "next/headers";
 
 export async function loginAgentAction(email: string) {
@@ -65,26 +65,26 @@ export async function logoutAgentAction() {
 }
 
 export async function markOrderCompleted(orderId: string) {
-  const { error } = await supabase.from("technical_orders").update({ status: "COMPLETADA" }).eq("id", orderId);
+  const { error } = await supabaseAdmin.from("technical_orders").update({ status: "COMPLETADA" }).eq("id", orderId);
   return { success: !error, error };
 }
 
 export async function deleteOrder(orderId: string) {
-  const { error } = await supabase.from("technical_orders").delete().eq("id", orderId);
+  const { error } = await supabaseAdmin.from("technical_orders").delete().eq("id", orderId);
   if (error) console.error("Error deleting order:", error);
   return { success: !error, error };
 }
 
 
 export async function deleteEvent(eventId: string) {
-  const { error } = await supabase.from("events").delete().eq("id", eventId);
+  const { error } = await supabaseAdmin.from("events").delete().eq("id", eventId);
   if (error) console.error("Error deleting event:", error);
   return { success: !error, error };
 }
 
 
 export async function deleteEventsByAccount(agentId: string, account: string) {
-  const { error } = await supabase.from("events").delete().eq("agent_id", agentId).eq("account_number", account);
+  const { error } = await supabaseAdmin.from("events").delete().eq("agent_id", agentId).eq("account_number", account);
   return { success: !error, error };
 }
 
@@ -99,7 +99,7 @@ export async function deleteOrdersByAccount(agentId: string, account: string) {
 
   if (!customer) return { error: "Cliente no encontrado." };
 
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from("technical_orders")
     .delete()
     .eq("agent_id", agentId)
