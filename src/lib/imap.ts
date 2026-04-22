@@ -3,7 +3,6 @@ import { supabase } from './supabase';
 import { parseX28Email } from './parser';
 
 export async function fetchAndProcessEmails() {
-  // Cargamos las librerías dinámicamente para que TypeScript no las valide en el build
   // @ts-ignore
   const { ImapFlow } = await import('imapflow');
   // @ts-ignore
@@ -27,7 +26,6 @@ export async function fetchAndProcessEmails() {
     try {
       const { data: agents } = await supabase.from('agents').select('id, email');
       if (!agents) throw new Error("No se pudieron cargar los agentes.");
-
 
       let uids = await client.search({ all: true });
       
@@ -67,7 +65,6 @@ export async function fetchAndProcessEmails() {
            }
         }
 
-
         if (targetAgent) {
           console.log(`Procesando mail para agente: ${targetAgent.email}`);
           const x28Data = parseX28Email(bodyText);
@@ -86,23 +83,23 @@ export async function fetchAndProcessEmails() {
         }
         await client.messageFlagsAdd(uid.toString(), ['\\Seen']);
       }
+      
+      await client.logout();
+      return { 
+        success: true, 
+        processedCount: uids.length,
+        agentEmailsFound: agents.map(a => a.email)
+      };
+
     } finally {
       lock.release();
     }
-
-    await client.logout();
-    return { 
-      success: true, 
-      processedCount: uids.length,
-      agentEmailsFound: agents.map(a => a.email)
-    };
   } catch (error: any) {
     console.error("IMAP Error:", error);
     try { await client.logout(); } catch(e) {}
     return { success: false, error: error.message };
   }
 }
-
 
 async function processX28Data(parsed: any, agentId: string, rawText: string) {
     const eventsToProcess = [];
