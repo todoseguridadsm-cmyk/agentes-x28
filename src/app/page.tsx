@@ -1,20 +1,32 @@
 
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import DashboardClient from "@/components/DashboardClient";
 
+export const revalidate = 0;
+
 export default async function Home() {
+  const cookieStore = await cookies();
+  const agentId = cookieStore.get("agent_id")?.value;
+
+  if (!agentId) {
+    redirect("/login");
+  }
+
   const supabase = await createClient();
 
-  // 1. Obtener el agente actual (simulado o desde auth)
+  // 1. Obtener el agente actual
   const { data: agent } = await supabase
     .from("agents")
     .select("*")
-    .eq("email", "todoseguridadsm@outlook.com")
+    .eq("id", agentId)
     .single();
 
   if (!agent) {
-    return <div className="p-20 text-center text-white">Agente no encontrado. Verifica la tabla 'agents'.</div>;
+    redirect("/login");
+    return null;
   }
 
   // 2. Obtener eventos y órdenes técnicas
