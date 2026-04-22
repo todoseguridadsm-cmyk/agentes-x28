@@ -1,6 +1,12 @@
 
+
+// @ts-ignore
 import { ImapFlow } from 'imapflow';
+
+
+// @ts-ignore
 import { simpleParser } from 'mailparser';
+
 import { supabase } from './supabase';
 import { parseX28Email } from './parser';
 
