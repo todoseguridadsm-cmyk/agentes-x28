@@ -1,15 +1,9 @@
 
-
-// @ts-ignore
+// @ts-nocheck
 import { ImapFlow } from 'imapflow';
-
-
-// @ts-ignore
 import { simpleParser } from 'mailparser';
-
 import { supabase } from './supabase';
 import { parseX28Email } from './parser';
-
 
 export async function fetchAndProcessEmails() {
   const client = new ImapFlow({
@@ -31,15 +25,12 @@ export async function fetchAndProcessEmails() {
       const { data: agents } = await supabase.from('agents').select('id, email');
       if (!agents) throw new Error("No se pudieron cargar los agentes.");
 
-      // 1. Buscar UIDs de mails no leídos
       let uids = await client.search({ seen: false });
       
       for (let uid of uids) {
-        // 2. Descargar el contenido del mail
         let message = await client.fetchOne(uid.toString(), { source: true });
         if (!message || !message.source) continue;
 
-        // @ts-ignore
         const parsed = await simpleParser(message.source);
         const bodyText = parsed.text || "";
         const subject = parsed.subject || "";
@@ -53,7 +44,6 @@ export async function fetchAndProcessEmails() {
         }
         
         if (!targetAgent) {
-           // @ts-ignore
            const toHeader = parsed.to?.text || "";
            for (const agent of agents) {
               if (toHeader.includes(agent.email)) {
@@ -79,14 +69,11 @@ export async function fetchAndProcessEmails() {
              });
           }
         }
-
-        // 3. Marcar como leído
         await client.messageFlagsAdd(uid.toString(), ['\\Seen']);
       }
     } finally {
       lock.release();
     }
-
     await client.logout();
     return { success: true };
   } catch (error) {
@@ -96,10 +83,8 @@ export async function fetchAndProcessEmails() {
   }
 }
 
-
 async function processX28Data(parsed: any, agentId: string, rawText: string) {
     const eventsToProcess = [];
-
     if (parsed.type === "MULTIPLE_EVENTS" && parsed.events) {
         eventsToProcess.push(...parsed.events);
     } else if (parsed.type === "REPORTE_EVENTOS" && parsed.events) {
@@ -120,32 +105,15 @@ async function processX28Data(parsed: any, agentId: string, rawText: string) {
         let customerId = null;
         const accountNum = ev.account || parsed.account;
         const customerName = ev.name || parsed.name;
-
         if (accountNum) {
-            const { data: customer } = await supabase
-                .from('customers')
-                .select('id')
-                .eq('account_number', accountNum)
-                .eq('agent_id', agentId)
-                .single();
-            
+            const { data: customer } = await supabase.from('customers').select('id').eq('account_number', accountNum).eq('agent_id', agentId).single();
             if (customer) {
                 customerId = customer.id;
             } else {
-                const { data: newCustomer } = await supabase
-                    .from('customers')
-                    .insert({ 
-                        agent_id: agentId,
-                        account_number: accountNum, 
-                        full_name: customerName || "Cliente Desconocido",
-                    })
-                    .select('id')
-                    .single();
-                
+                const { data: newCustomer } = await supabase.from('customers').insert({ agent_id: agentId, account_number: accountNum, full_name: customerName || "Cliente Desconocido" }).select('id').single();
                 customerId = newCustomer?.id;
             }
         }
-
         await supabase.from('events').insert({
             agent_id: agentId,
             customer_id: customerId,
@@ -157,36 +125,17 @@ async function processX28Data(parsed: any, agentId: string, rawText: string) {
         });
     }
 
-
     if (parsed.type === "SERVICIO_TECNICO" && parsed.technicalOrder) {
         let customerId = null;
         if (parsed.account) {
-            const { data: customer } = await supabase
-                .from('customers')
-                .select('id')
-                .eq('account_number', parsed.account)
-                .eq('agent_id', agentId)
-                .single();
-            
+            const { data: customer } = await supabase.from('customers').select('id').eq('account_number', parsed.account).eq('agent_id', agentId).single();
             if (customer) {
                 customerId = customer.id;
             } else {
-                const { data: newCustomer } = await supabase
-                    .from('customers')
-                    .insert({ 
-                        agent_id: agentId,
-                        account_number: parsed.account, 
-                        full_name: parsed.name,
-                        phone: parsed.technicalOrder?.phone,
-                        address: parsed.technicalOrder?.address,
-                        panel_model: parsed.technicalOrder?.panelModel
-                    })
-                    .select('id')
-                    .single();
+                const { data: newCustomer } = await supabase.from('customers').insert({ agent_id: agentId, account_number: parsed.account, full_name: parsed.name, phone: parsed.technicalOrder?.phone, address: parsed.technicalOrder?.address, panel_model: parsed.technicalOrder?.panelModel }).select('id').single();
                 customerId = newCustomer?.id;
             }
         }
-
         await supabase.from('technical_orders').insert({
             agent_id: agentId,
             customer_id: customerId,
@@ -195,4 +144,3 @@ async function processX28Data(parsed: any, agentId: string, rawText: string) {
         });
     }
 }
-
