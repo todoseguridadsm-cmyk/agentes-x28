@@ -30,23 +30,28 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
     setOpenSection(openSection === section ? null : section);
   };
 
+
   const handleCompleteOrder = async (id: string, e: React.MouseEvent) => {
      e.stopPropagation();
+     if(!confirm("¿Marcar este servicio como completado?")) return;
      await markOrderCompleted(id);
      router.refresh();
   };
 
   const handleDeleteOrder = async (id: string, e: React.MouseEvent) => {
      e.stopPropagation();
+     if(!confirm("¿Eliminar este registro permanentemente?")) return;
      await deleteOrder(id);
      router.refresh();
   };
 
   const handleDeleteEvent = async (id: string, e: React.MouseEvent) => {
      e.stopPropagation();
+     if(!confirm("¿Eliminar este evento?")) return;
      await deleteEvent(id);
      router.refresh();
   };
+
 
 
 
