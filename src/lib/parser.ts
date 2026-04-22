@@ -71,37 +71,59 @@ export function parseX28Email(emailText: string): ParsedEvent {
       const name = headerMatch ? headerMatch[2].trim() : null;
 
 
+
       // Buscar líneas de eventos dentro del bloque
-      const lines = block.split('\n');
-      for (const line of lines) {
-        // Intentamos detectar una línea que empiece con fecha
+      const blockLines = block.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      for (let i = 0; i < blockLines.length; i++) {
+        const line = blockLines[i];
         const dateMatch = line.match(/^(\d{2}-\d{2}-\d{4}\s\d{2}:\d{2}:\d{2})/);
+        
         if (dateMatch) {
           const date = dateMatch[1];
-          // Dividimos el resto de la línea por tabs o múltiples espacios
+          let eventDescription = "";
+          let eventZone = "";
+          let eventName = name; // Por defecto usamos el del bloque
+
+          // Opción 1: Todo en la misma línea (separado por tabs o muchos espacios)
           const parts = line.split(/[\t]{1,}|[\s]{2,}/).map(p => p.trim()).filter(p => p.length > 0);
-          
-          // parts[0] es la fecha
-          // parts[1] suele ser el nombre del cliente + GPRS/WIFI
-          // parts[2] es la descripción del evento (Robo, Señal No Recibida, etc)
-          // parts[3] es la zona (opcional)
-          
           if (parts.length >= 3) {
-            const description = parts[2];
-            const classification = classify(description);
-            
+            eventDescription = parts[2];
+            eventZone = parts[3] || "";
+          } 
+          // Opción 2: Multi-línea (Outlook style)
+          else {
+            // El nombre suele estar en la siguiente línea
+            if (blockLines[i+1] && !blockLines[i+1].match(/^\d{2}-\d{2}-\d{4}/)) {
+              eventName = blockLines[i+1];
+              // El evento en la siguiente
+              if (blockLines[i+2]) {
+                eventDescription = blockLines[i+2];
+                // Y la zona en la que sigue si empieza con paréntesis
+                if (blockLines[i+3] && blockLines[i+3].startsWith('(')) {
+                  eventZone = blockLines[i+3];
+                  i += 3; // Saltamos 3 líneas
+                } else {
+                  i += 2; // Saltamos 2 líneas
+                }
+              }
+            }
+          }
+
+          if (eventDescription) {
+            const classification = classify(eventDescription);
             result.events.push({
               date: date,
-              description: description,
-              zone: parts[3] || "",
+              description: eventDescription,
+              zone: eventZone,
               account: account,
-              name: name,
+              name: eventName,
               priority: classification.priority,
               eventType: classification.type
             });
           }
         }
       }
+
 
     }
 
