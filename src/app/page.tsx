@@ -26,7 +26,6 @@ export default async function Home() {
 
   if (!agent) {
     redirect("/login");
-    return null;
   }
 
   // 2. Obtener eventos y órdenes técnicas
