@@ -1,11 +1,14 @@
 
-// @ts-nocheck
-import { ImapFlow } from 'imapflow';
-import { simpleParser } from 'mailparser';
 import { supabase } from './supabase';
 import { parseX28Email } from './parser';
 
 export async function fetchAndProcessEmails() {
+  // Cargamos las librerías dinámicamente para que TypeScript no las valide en el build
+  // @ts-ignore
+  const { ImapFlow } = await import('imapflow');
+  // @ts-ignore
+  const { simpleParser } = await import('mailparser');
+
   const client = new ImapFlow({
     host: process.env.IMAP_HOST || 'imap.hostinger.com',
     port: parseInt(process.env.IMAP_PORT || '993'),
