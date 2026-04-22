@@ -189,7 +189,9 @@ export function parseX28Email(emailText: string): ParsedEvent {
 
     const addressMatch = cleanText.match(/Domicilio\s*:\s*([^\n\r]+)/i);
     const panelMatch = cleanText.match(/Modelo Panel\s*:\s*([^\n\r]+)/i);
-    const obsMatch = cleanText.match(/Observaciones\s*:\s*([\s\S]*?)(?:Garantia|$)/i);
+
+    const obsMatch = cleanText.match(/Observaciones\s*:\s*([\s\S]*?)(?:Garantia|Conformidad|Firma|Aclaracion|Cliente|$)/i);
+
     const chipMatch = cleanText.match(/Telef\.\s*:\s*([^\n\r]+)/i);
     const contactMatch = cleanText.match(/Contacto\s*:\s*(.*?)\s+(\d{7,15})/i);
 

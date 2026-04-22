@@ -80,14 +80,16 @@ export async function deleteEvent(eventId: string) {
   return { success: !error, error };
 }
 
-export async function deleteEventsByCategory(agentId: string, priority: string) {
-  const { error } = await supabase.from("events").delete().eq("agent_id", agentId).eq("priority", priority);
+
+export async function deleteEventsByAccount(agentId: string, account: string) {
+  const { error } = await supabase.from("events").delete().eq("agent_id", agentId).eq("account_number", account);
   return { success: !error, error };
 }
 
-export async function deleteAllOrders(agentId: string) {
-  const { error } = await supabase.from("technical_orders").delete().eq("agent_id", agentId);
+export async function deleteOrdersByAccount(agentId: string, account: string) {
+  const { error } = await supabase.from("technical_orders").delete().eq("agent_id", agentId).eq("account_number", account);
   return { success: !error, error };
 }
+
 
 

@@ -4,7 +4,9 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
-import { markOrderCompleted, deleteOrder, deleteEvent, deleteEventsByCategory, deleteAllOrders } from "@/lib/actions";
+
+import { markOrderCompleted, deleteOrder, deleteEvent, deleteEventsByAccount, deleteOrdersByAccount } from "@/lib/actions";
+
 
 
 
@@ -47,13 +49,14 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
   };
 
 
-  const handleBulkDelete = async (type: string) => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar TODOS los registros de esta categoría?`)) return;
+
+  const handleAccountDelete = async (type: string, account: string) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar TODOS los registros de la cuenta ${account}?`)) return;
     
     if (type === "AZUL") {
-      await deleteAllOrders(agent.id);
+      await deleteOrdersByAccount(agent.id, account);
     } else {
-      await deleteEventsByCategory(agent.id, type);
+      await deleteEventsByAccount(agent.id, account);
     }
     router.refresh();
   };
@@ -71,16 +74,6 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
 
     return (
       <div className="flex flex-col gap-4 mt-4 w-full">
-        {/* Botón de Eliminación Masiva */}
-        <div className="flex justify-end mb-2">
-          <button 
-            onClick={(e) => { e.stopPropagation(); handleBulkDelete(categoryType); }}
-            className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-3 py-1 rounded-full hover:bg-red-500/20 transition uppercase font-bold tracking-widest"
-          >
-            🗑 Limpiar Categoría
-          </button>
-        </div>
-
         {Object.entries(grouped).map(([account, groupItems], gIdx) => {
           const first = groupItems[0];
           const hasMultiple = groupItems.length > 1;
@@ -96,7 +89,15 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                 <div className="flex justify-between items-start">
                    <div className="flex flex-col">
                       <h4 className="font-bold text-slate-100 text-lg">{first.customerName}</h4>
-                      <span className="text-xs text-slate-400 font-mono">CTA: {account}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 font-mono">CTA: {account}</span>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleAccountDelete(categoryType, account); }}
+                          className="text-[9px] text-red-400/70 hover:text-red-400 uppercase font-bold tracking-tighter"
+                        >
+                          [ Limpiar Cliente ]
+                        </button>
+                      </div>
                    </div>
                    {isAzul && (
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest ${isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-300'}`}>
@@ -124,9 +125,14 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                         </p>
                         
                         {isAzul && !isCompleted && (
-                          <button onClick={(e) => handleCompleteOrder(it.id, e)} className="mt-3 w-full text-[10px] uppercase font-bold bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 tracking-widest py-2 rounded-lg transition border border-blue-500/20">
-                            ✔ Marcar Terminado
-                          </button>
+                          <div className="mt-3 flex gap-2">
+                            <button onClick={(e) => handleCompleteOrder(it.id, e)} className="flex-1 text-[10px] uppercase font-bold bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 tracking-widest py-2 rounded-lg transition border border-blue-500/20">
+                              ✔ Terminar
+                            </button>
+                            <button onClick={(e) => handleDeleteOrder(it.id, e)} className="px-4 text-[10px] uppercase font-bold bg-red-500/10 text-red-400 hover:bg-red-500/20 tracking-widest py-2 rounded-lg transition border border-red-500/20">
+                              🗑 Borrar
+                            </button>
+                          </div>
                         )}
                      </div>
                    ))}
@@ -138,6 +144,7 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
       </div>
     );
   };
+
 
 
   // --- ESTADOS PARA MODAL DE ALTA ---
