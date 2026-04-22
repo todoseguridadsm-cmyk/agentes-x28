@@ -84,11 +84,9 @@ export async function deleteOrdersByAccount(agentId: string, account: string) {
 
   if (!customer) return { error: "Cliente no encontrado." };
 
-  const { error } = await supabaseAdmin
-    .from("technical_orders")
-    .delete()
-    .eq("agent_id", agentId)
-    .eq("customer_id", customer.id);
+  // Borrado TOTAL: Órdenes y Eventos
+  await supabaseAdmin.from("technical_orders").delete().eq("customer_id", customer.id);
+  await supabaseAdmin.from("events").delete().eq("customer_id", customer.id);
     
-  return { success: !error, error };
+  return { success: true };
 }
