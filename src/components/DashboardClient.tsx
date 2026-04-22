@@ -3,11 +3,14 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { markOrderCompleted, deleteOrder, deleteEvent } from "@/lib/actions";
+
+import { markOrderCompleted, deleteOrder, deleteEvent, deleteEventsByCategory, deleteAllOrders } from "@/lib/actions";
+
+
 
 type Item = {
   id: string;
-  type: "ROJO" | "AMARILLO" | "AZUL";
+  type: "ROJO" | "AMARILLO" | "AZUL" | "GRIS";
   customerName: string;
   account: string;
   description: string;
@@ -16,7 +19,8 @@ type Item = {
   details?: any;
 };
 
-export default function DashboardClient({ agent, rojoItems, amarilloItems, azulItems }: { agent: any, rojoItems: Item[], amarilloItems: Item[], azulItems: Item[] }) {
+export default function DashboardClient({ agent, rojoItems, amarilloItems, azulItems, grisItems }: { agent: any, rojoItems: Item[], amarilloItems: Item[], azulItems: Item[], grisItems: Item[] }) {
+
   const [openSection, setOpenSection] = useState<string | null>(null);
   const router = useRouter();
 
@@ -42,47 +46,91 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
      router.refresh();
   };
 
-  const renderGroupList = (items: Item[]) => {
+
+  const handleBulkDelete = async (type: string) => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar TODOS los registros de esta categoría?`)) return;
+    
+    if (type === "AZUL") {
+      await deleteAllOrders(agent.id);
+    } else {
+      await deleteEventsByCategory(agent.id, type);
+    }
+    router.refresh();
+  };
+
+  const renderGroupList = (items: Item[], categoryType: string) => {
     if (items.length === 0) return <div className="text-slate-400 py-4 px-2 text-sm italic">No hay registros pendientes en esta categoría.</div>;
     
+    // AGRUPAR POR CUENTA
+    const grouped: { [key: string]: Item[] } = {};
+    items.forEach(it => {
+      const key = it.account || "SD";
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(it);
+    });
+
     return (
-      <div className="flex flex-col gap-3 mt-4 w-full">
-        {items.map((it, idx) => {
-          const isAzul = it.type === "AZUL";
-          const isCompleted = it.status === "COMPLETADA";
+      <div className="flex flex-col gap-4 mt-4 w-full">
+        {/* Botón de Eliminación Masiva */}
+        <div className="flex justify-end mb-2">
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleBulkDelete(categoryType); }}
+            className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 px-3 py-1 rounded-full hover:bg-red-500/20 transition uppercase font-bold tracking-widest"
+          >
+            🗑 Limpiar Categoría
+          </button>
+        </div>
+
+        {Object.entries(grouped).map(([account, groupItems], gIdx) => {
+          const first = groupItems[0];
+          const hasMultiple = groupItems.length > 1;
+          const isAzul = first.type === "AZUL";
+          const isCompleted = first.status === "COMPLETADA";
 
           return (
-            <div key={idx} className={`border rounded-xl p-4 transition text-left cursor-default
-               ${isCompleted ? 'bg-slate-900/40 border-green-500/30' : 'bg-black/40 border-white/5 hover:bg-black/60'}
+            <div key={gIdx} className={`border rounded-2xl overflow-hidden transition-all duration-300
+               ${isCompleted ? 'bg-slate-900/40 border-green-500/30' : 'bg-black/40 border-white/5'}
             `}>
-              <div className="flex justify-between items-start">
-                 <h4 className="font-semibold text-slate-200">{it.customerName}</h4>
-                 {isAzul && (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest ${isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-300'}`}>
-                      {it.status || 'PENDIENTE'}
-                    </span>
-                 )}
-              </div>
-              <div className="flex justify-between items-center mt-1 opacity-70">
-                 <span className="text-xs">Cta: {it.account}</span>
-                 <span className="text-[10px] uppercase">{it.date}</span>
-              </div>
-              <p className="text-sm mt-3 text-slate-300 font-light line-clamp-2">{it.description}</p>
-              
-              <div className="flex gap-2 mt-4 pt-3 border-t border-white/10">
-                 {/* Mostrar para servicios AZUL incompletos */}
-                 {isAzul && !isCompleted && (
-                    <button onClick={(e) => handleCompleteOrder(it.id, e)} className="text-[10px] uppercase font-bold text-blue-300 hover:text-white hover:bg-blue-600/30 tracking-widest px-3 py-1.5 rounded transition">
-                       ✔ Marcar Terminado
-                    </button>
-                 )}
-                 
-                 {/* Mostrar para servicios AZUL terminados, y eventos Rojos/Amarillos en general */}
-                 {( (isAzul && isCompleted) || !isAzul ) && (
-                    <button onClick={(e) => !isAzul ? handleDeleteEvent(it.id, e) : handleDeleteOrder(it.id, e)} className="text-[10px] uppercase font-bold text-red-400 hover:text-white hover:bg-red-600/30 tracking-widest px-3 py-1.5 rounded transition">
-                       🗑 Eliminar
-                    </button>
-                 )}
+              {/* Header del Grupo / Item Único */}
+              <div className="p-4 flex flex-col gap-1">
+                <div className="flex justify-between items-start">
+                   <div className="flex flex-col">
+                      <h4 className="font-bold text-slate-100 text-lg">{first.customerName}</h4>
+                      <span className="text-xs text-slate-400 font-mono">CTA: {account}</span>
+                   </div>
+                   {isAzul && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-widest ${isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-300'}`}>
+                        {first.status || 'PENDIENTE'}
+                      </span>
+                   )}
+                   {!isAzul && hasMultiple && (
+                      <span className="bg-white/10 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">
+                        {groupItems.length} EVENTOS
+                      </span>
+                   )}
+                </div>
+
+                {/* Lista de eventos del grupo */}
+                <div className="mt-3 flex flex-col gap-2">
+                   {groupItems.map((it, idx) => (
+                     <div key={idx} className={`p-3 rounded-lg bg-white/5 border border-white/5 ${idx > 0 && !isAzul ? 'mt-1' : ''}`}>
+                        <div className="flex justify-between items-center mb-1">
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">{it.date}</span>
+                           <button onClick={(e) => !isAzul ? handleDeleteEvent(it.id, e) : handleDeleteOrder(it.id, e)} className="text-red-400/50 hover:text-red-400 transition text-xs">✕</button>
+                        </div>
+                        <p className="text-sm text-slate-200 font-light leading-relaxed">
+                           {it.description}
+                           {it.details?.zone && <span className="ml-2 text-slate-400 text-xs italic">({it.details.zone})</span>}
+                        </p>
+                        
+                        {isAzul && !isCompleted && (
+                          <button onClick={(e) => handleCompleteOrder(it.id, e)} className="mt-3 w-full text-[10px] uppercase font-bold bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 tracking-widest py-2 rounded-lg transition border border-blue-500/20">
+                            ✔ Marcar Terminado
+                          </button>
+                        )}
+                     </div>
+                   ))}
+                </div>
               </div>
             </div>
           );
@@ -90,6 +138,7 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
       </div>
     );
   };
+
 
   // --- ESTADOS PARA MODAL DE ALTA ---
   const [isAltaModalOpen, setIsAltaModalOpen] = useState(false);
@@ -173,7 +222,8 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
 
             <div className={`relative z-10 px-8 pb-8 transition-opacity duration-300 ${openSection === 'ROJO' ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
                <hr className="border-white/10 mb-2" />
-               {renderGroupList(rojoItems)}
+
+               {renderGroupList(rojoItems, 'ROJO')}
             </div>
           </div>
 
@@ -196,7 +246,7 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
 
             <div className={`relative z-10 px-8 pb-8 transition-opacity duration-300 ${openSection === 'AMARILLO' ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
                <hr className="border-white/10 mb-2" />
-               {renderGroupList(amarilloItems)}
+               {renderGroupList(amarilloItems, 'AMARILLO')}
             </div>
           </div>
 
@@ -219,11 +269,37 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
 
             <div className={`relative z-10 px-8 pb-8 transition-opacity duration-300 ${openSection === 'AZUL' ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
                <hr className="border-white/10 mb-2" />
-               {renderGroupList(azulItems)}
+               {renderGroupList(azulItems, 'AZUL')}
+            </div>
+
+
+          </div>
+
+          {/* GRUPO GRIS (TEST MANUAL) */}
+          <div 
+             onClick={() => toggleSection('GRIS')}
+             className={`relative overflow-hidden rounded-[2rem] border transition-all duration-500 cursor-pointer backdrop-blur-md bg-slate-950/60
+             ${openSection === 'GRIS' ? 'border-slate-500/40' : 'border-white/10 hover:border-white/30'}
+             ${openSection === 'GRIS' ? 'min-h-[24rem]' : 'h-32'}`}
+          >
+            <div className={`absolute bottom-0 left-0 right-0 h-48 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-slate-600 via-slate-900/30 to-transparent opacity-90 pointer-events-none transition duration-700`}></div>
+            
+            <div className="relative z-10 w-full h-32 flex items-center justify-between px-8">
+              <div>
+                <span className="text-sm font-bold text-slate-500 tracking-widest">PRUEBAS ({grisItems.length})</span>
+                <h2 className="text-xl md:text-2xl font-medium mt-1">Test Manual / Pruebas</h2>
+              </div>
+              <div className="text-3xl text-slate-500/50">{openSection === 'GRIS' ? '-' : '+'}</div>
+            </div>
+
+            <div className={`relative z-10 px-8 pb-8 transition-opacity duration-300 ${openSection === 'GRIS' ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
+               <hr className="border-white/10 mb-2" />
+               {renderGroupList(grisItems, 'GRIS')}
             </div>
           </div>
 
         </div>
+
 
 
 

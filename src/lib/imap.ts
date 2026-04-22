@@ -143,14 +143,28 @@ async function processX28Data(parsed: any, agentId: string, rawText: string) {
         });
     }
 
+
     if (parsed.type === "SERVICIO_TECNICO" && parsed.technicalOrder) {
         let customerId = null;
         if (parsed.account) {
-            const { data: customer } = await supabase.from('customers').select('id').eq('account_number', parsed.account).eq('agent_id', agentId).single();
+            const { data: customer } = await supabase.from('customers').select('*').eq('account_number', parsed.account).eq('agent_id', agentId).single();
             if (customer) {
                 customerId = customer.id;
+                // Actualizar info si hay datos nuevos
+                await supabase.from('customers').update({ 
+                    phone: parsed.technicalOrder?.phone || customer.phone,
+                    address: parsed.technicalOrder?.address || customer.address,
+                    panel_model: parsed.technicalOrder?.panelModel || customer.panel_model
+                }).eq('id', customerId);
             } else {
-                const { data: newCustomer } = await supabase.from('customers').insert({ agent_id: agentId, account_number: parsed.account, full_name: parsed.name, phone: parsed.technicalOrder?.phone, address: parsed.technicalOrder?.address, panel_model: parsed.technicalOrder?.panelModel }).select('id').single();
+                const { data: newCustomer } = await supabase.from('customers').insert({ 
+                    agent_id: agentId, 
+                    account_number: parsed.account, 
+                    full_name: parsed.name, 
+                    phone: parsed.technicalOrder?.phone, 
+                    address: parsed.technicalOrder?.address, 
+                    panel_model: parsed.technicalOrder?.panelModel 
+                }).select('id').single();
                 customerId = newCustomer?.id;
             }
         }
@@ -161,4 +175,5 @@ async function processX28Data(parsed: any, agentId: string, rawText: string) {
             observations: parsed.technicalOrder.observations
         });
     }
+
 }

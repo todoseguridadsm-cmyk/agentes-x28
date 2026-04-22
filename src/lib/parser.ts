@@ -47,10 +47,15 @@ export function parseX28Email(emailText: string): ParsedEvent {
     if (d.includes("robo") || d.includes("disparo") || d.includes("alarma")) {
       return { priority: "ROJO" as const, type: "ALERTA_ROBO" };
     }
+
+    if (d.includes("test manual")) {
+      return { priority: "GRIS" as const, type: "TEST_MANUAL" };
+    }
     if (d.includes("senal no recibida") || d.includes("keep alive") || d.includes("comunicacion") || d.includes("perdida de") || d.includes("fallo")) {
       return { priority: "AMARILLO" as const, type: "FALLO_COMUNICACION" };
     }
     return { priority: "AZUL" as const, type: "NORMAL" };
+
   };
 
   // 1. FORMATO: BRN-XXXX (Bulk / Masivo)
@@ -197,11 +202,32 @@ export function parseX28Email(emailText: string): ParsedEvent {
       warranty: null
     };
 
-    const accountMatch = cleanText.match(/Cuenta\s*N:\s*([A-Za-z0-9\-\s]+?)\s*Nombre:\s*(.*?)(?:- WIFI|- GPRS|Estado de)/i);
+
+    const accountMatch = cleanText.match(/Cuenta\s*N:\s*([A-Za-z0-9\-\s]+?)\s*Nombre:\s*(.*?)(?:- WIFI|- GPRS|Estado de|\n)/i);
     if (accountMatch) {
       result.account = accountMatch[1].replace(/\s+/g, '').trim(); 
       result.name = accountMatch[2].trim();
     }
+
+
+    // Extraer datos de contacto
+    const addressMatch = cleanText.match(/Domicilio\s*:\s*([^\n\r]+)/i);
+    const panelMatch = cleanText.match(/Modelo Panel\s*:\s*([^\n\r]+)/i);
+    const obsMatch = cleanText.match(/Observaciones\s*:\s*([\s\S]*?)(?:Garantia|$)/i);
+    
+    // El campo Telef. es el chip del comunicador
+    const chipMatch = cleanText.match(/Telef\.\s*:\s*([^\n\r]+)/i);
+    
+    // El celular real está en la línea de Contacto (al final)
+    const contactMatch = cleanText.match(/Contacto\s*:\s*(.*?)\s+(\d{7,15})/i);
+
+    if (result.technicalOrder) {
+        result.technicalOrder.phone = contactMatch ? contactMatch[2].trim() : (chipMatch ? chipMatch[1].trim() : null);
+        result.technicalOrder.address = addressMatch ? addressMatch[1].trim() : null;
+        result.technicalOrder.panelModel = panelMatch ? panelMatch[1].trim() : null;
+        result.technicalOrder.observations = obsMatch ? obsMatch[1].trim() : "Solicitud de servicio técnico";
+    }
+
 
     const orderMatch = cleanText.match(/Orden\s*N:\s*(\d+)/i);
     if (orderMatch && result.technicalOrder) result.technicalOrder.orderNumber = orderMatch[1];

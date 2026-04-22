@@ -74,8 +74,20 @@ export async function deleteOrder(orderId: string) {
   return { success: !error, error };
 }
 
+
 export async function deleteEvent(eventId: string) {
   const { error } = await supabase.from("events").delete().eq("id", eventId);
   return { success: !error, error };
 }
+
+export async function deleteEventsByCategory(agentId: string, priority: string) {
+  const { error } = await supabase.from("events").delete().eq("agent_id", agentId).eq("priority", priority);
+  return { success: !error, error };
+}
+
+export async function deleteAllOrders(agentId: string) {
+  const { error } = await supabase.from("technical_orders").delete().eq("agent_id", agentId);
+  return { success: !error, error };
+}
+
 

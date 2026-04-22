@@ -43,16 +43,18 @@ export default async function Home() {
      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
+
   const rojoItems: any[] = [];
   const amarilloItems: any[] = [];
   const azulItems: any[] = [];
+  const grisItems: any[] = [];
 
   allFeedItems.forEach(item => {
      const isEvent = item.event_type !== undefined;
 
      const parsedItem = {
         id: item.id,
-        type: item.priority as "ROJO" | "AMARILLO" | "AZUL",
+        type: item.priority as "ROJO" | "AMARILLO" | "AZUL" | "GRIS",
         customerName: item.customers?.full_name || "Desconocido",
         account: item.account_number || item.customers?.account_number || "S/D",
         description: isEvent ? item.description : item.observations || "Alta Pendiente",
@@ -69,8 +71,10 @@ export default async function Home() {
 
      if (parsedItem.type === "ROJO") rojoItems.push(parsedItem);
      else if (parsedItem.type === "AMARILLO") amarilloItems.push(parsedItem);
-     else azulItems.push(parsedItem);
+     else if (parsedItem.type === "AZUL") azulItems.push(parsedItem);
+     else grisItems.push(parsedItem);
   });
+
 
   return (
     <main className="min-h-screen bg-black text-white relative overflow-hidden font-sans flex flex-col">
@@ -108,7 +112,9 @@ export default async function Home() {
          📞 0810-555-5666
       </a>
 
-      <DashboardClient agent={agent} rojoItems={rojoItems} amarilloItems={amarilloItems} azulItems={azulItems} />
+
+      <DashboardClient agent={agent} rojoItems={rojoItems} amarilloItems={amarilloItems} azulItems={azulItems} grisItems={grisItems} />
+
       
     </main>
   );
