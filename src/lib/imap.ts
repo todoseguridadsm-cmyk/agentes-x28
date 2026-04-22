@@ -89,14 +89,20 @@ export async function fetchAndProcessEmails() {
     } finally {
       lock.release();
     }
+
     await client.logout();
-    return { success: true };
-  } catch (error) {
+    return { 
+      success: true, 
+      processedCount: uids.length,
+      agentEmailsFound: agents.map(a => a.email)
+    };
+  } catch (error: any) {
     console.error("IMAP Error:", error);
     try { await client.logout(); } catch(e) {}
-    throw error;
+    return { success: false, error: error.message };
   }
 }
+
 
 async function processX28Data(parsed: any, agentId: string, rawText: string) {
     const eventsToProcess = [];
