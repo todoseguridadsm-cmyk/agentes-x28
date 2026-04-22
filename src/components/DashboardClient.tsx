@@ -120,7 +120,7 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                         </div>
                         <p className="text-sm text-slate-200 font-light leading-relaxed">
                            {it.description}
-                           {it.details?.details?.zone && <span className="ml-2 text-slate-400 text-xs italic">({it.details.details.zone})</span>}
+                           {it.details?.zone && <span className="ml-2 text-slate-400 text-xs italic">({it.details.zone})</span>}
                         </p>
                         
                         {isAzul && !isCompleted && (
@@ -216,6 +216,7 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                       </div>
                    ) : (
                       <>
+                        {altaError && <div className="bg-red-500/10 text-red-400 p-3 rounded-lg text-xs border border-red-500/20">{altaError}</div>}
                         <div className="flex flex-col gap-1">
                            <label className="text-xs text-slate-400 uppercase tracking-wider font-bold">Cliente *</label>
                            <input required name="cliente" type="text" className="bg-black/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-orange-500/50 text-white" />
