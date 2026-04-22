@@ -31,40 +31,45 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
   };
 
 
+
   const handleCompleteOrder = async (id: string, e: React.MouseEvent) => {
      e.stopPropagation();
      if(!confirm("¿Marcar este servicio como completado?")) return;
-     await markOrderCompleted(id);
+     const res = await markOrderCompleted(id);
+     if (res.error) alert("Error al completar: " + (res.error as any).message);
      router.refresh();
   };
 
   const handleDeleteOrder = async (id: string, e: React.MouseEvent) => {
      e.stopPropagation();
      if(!confirm("¿Eliminar este registro permanentemente?")) return;
-     await deleteOrder(id);
+     const res = await deleteOrder(id);
+     if (res.error) alert("Error al eliminar orden: " + (res.error as any).message);
      router.refresh();
   };
 
   const handleDeleteEvent = async (id: string, e: React.MouseEvent) => {
      e.stopPropagation();
      if(!confirm("¿Eliminar este evento?")) return;
-     await deleteEvent(id);
+     const res = await deleteEvent(id);
+     if (res.error) alert("Error al eliminar evento: " + (res.error as any).message);
      router.refresh();
   };
-
-
-
 
   const handleAccountDelete = async (type: string, account: string) => {
     if (!confirm(`¿Estás seguro de que quieres eliminar TODOS los registros de la cuenta ${account}?`)) return;
     
+    let res;
     if (type === "AZUL") {
-      await deleteOrdersByAccount(agent.id, account);
+      res = await deleteOrdersByAccount(agent.id, account);
     } else {
-      await deleteEventsByAccount(agent.id, account);
+      res = await deleteEventsByAccount(agent.id, account);
     }
+    
+    if (res?.error) alert("Error al limpiar cuenta: " + (res.error as any).message);
     router.refresh();
   };
+
 
   const renderGroupList = (items: Item[], categoryType: string) => {
     if (items.length === 0) return <div className="text-slate-400 py-4 px-2 text-sm italic">No hay registros pendientes en esta categoría.</div>;
