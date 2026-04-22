@@ -75,6 +75,20 @@ export async function POST(req: Request) {
 
     const parsed = parseX28Email(rawText);
 
+    // -- EVITAR DUPLICADOS --
+    const { data: existingEvent } = await supabase
+      .from('events')
+      .select('id')
+      .eq('agent_id', agentId)
+      .eq('raw_email_text', rawText)
+      .limit(1)
+      .single();
+
+    if (existingEvent) {
+       console.log("Webhook: Email ya procesado (duplicado).");
+       return NextResponse.json({ success: true, message: "Email ya procesado anteriormente." });
+    }
+
 
 
     if (parsed.type === "DESCONOCIDO") {

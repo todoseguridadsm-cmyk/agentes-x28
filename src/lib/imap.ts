@@ -27,7 +27,7 @@ export async function fetchAndProcessEmails() {
       const { data: agents } = await supabase.from('agents').select('id, email');
       if (!agents) throw new Error("No se pudieron cargar los agentes.");
 
-      let uids = await client.search({ all: true });
+      let uids = await client.search({ unseen: true });
       
       for (let uid of uids) {
         let message = await client.fetchOne(uid.toString(), { source: true });
@@ -67,6 +67,22 @@ export async function fetchAndProcessEmails() {
 
         if (targetAgent) {
           console.log(`Procesando mail para agente: ${targetAgent.email}`);
+
+          // -- EVITAR DUPLICADOS: Check if this email was already processed --
+          const { data: existingEvent } = await supabase
+            .from('events')
+            .select('id')
+            .eq('agent_id', targetAgent.id)
+            .eq('raw_email_text', bodyText)
+            .limit(1)
+            .single();
+
+          if (existingEvent) {
+             console.log("Email ya procesado (evento duplicado detectado). Saltando...");
+             await client.messageFlagsAdd(uid.toString(), ['\\Seen']);
+             continue;
+          }
+
           const x28Data = parseX28Email(bodyText);
           
           if (x28Data.type !== "DESCONOCIDO") {
