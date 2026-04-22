@@ -118,12 +118,10 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                            <span className="text-[10px] text-slate-400 uppercase font-bold">{it.date}</span>
                            <button onClick={(e) => !isAzul ? handleDeleteEvent(it.id, e) : handleDeleteOrder(it.id, e)} className="text-red-400/50 hover:text-red-400 transition text-xs">✕</button>
                         </div>
-
                         <p className="text-sm text-slate-200 font-light leading-relaxed">
                            {it.description}
                            {it.details && (it.details as any).zone && <span className="ml-2 text-slate-400 text-xs italic">({(it.details as any).zone})</span>}
                         </p>
-
                         
                         {isAzul && !isCompleted && (
                           <div className="mt-3 flex gap-2">
@@ -217,10 +215,8 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                          <h3 className="text-green-400 font-bold text-xl uppercase tracking-widest">¡Enviado a Cuidar!</h3>
                       </div>
                    ) : (
-
                       <>
                         {altaError && <div className="bg-red-500/10 text-red-400 p-3 rounded-lg text-xs border border-red-500/20">{String(altaError)}</div>}
-
                         <div className="flex flex-col gap-1">
                            <label className="text-xs text-slate-400 uppercase tracking-wider font-bold">Cliente *</label>
                            <input required name="cliente" type="text" className="bg-black/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-orange-500/50 text-white" />
