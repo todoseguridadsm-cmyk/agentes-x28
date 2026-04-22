@@ -229,26 +229,21 @@ export function parseX28Email(emailText: string): ParsedEvent {
     }
 
 
+
     const orderMatch = cleanText.match(/Orden\s*N:\s*(\d+)/i);
     if (orderMatch && result.technicalOrder) result.technicalOrder.orderNumber = orderMatch[1];
 
     const modelMatch = cleanText.match(/Panel Modelo:\s*(.*?)(?:Fecha|Versi(?:ó|o)n)/i);
-    if (modelMatch && result.technicalOrder) result.technicalOrder.panelModel = modelMatch[1].trim();
-
-    const phoneMatch = cleanText.match(/Tel(?:ó|e)fono:\s*([0-9\-\s]+)/i);
-    if (phoneMatch && result.technicalOrder) result.technicalOrder.phone = phoneMatch[1].trim();
-
-    const addressMatch = cleanText.match(/Calle:\s*(.*?)(?:Localidad:|$)/i);
-    if (addressMatch && result.technicalOrder) result.technicalOrder.address = addressMatch[1].trim();
-    
-    const obsMatch = cleanText.match(/Observaciones:\s*([\s\S]*?)(?:Acciones:|$)/i);
-    if (obsMatch && result.technicalOrder) result.technicalOrder.observations = obsMatch[1].trim().replace(/\n/g, ' ');
+    if (modelMatch && result.technicalOrder && !result.technicalOrder.panelModel) {
+        result.technicalOrder.panelModel = modelMatch[1].trim();
+    }
 
     const warrantyMatch = cleanText.match(/garantia:\s*(.*?)(?:\(|CON GARANTIA|SIN GARANTIA)/i);
     if (warrantyMatch && result.technicalOrder) result.technicalOrder.warranty = warrantyMatch[1].trim();
 
     return result;
   }
+
 
   return result;
 }
