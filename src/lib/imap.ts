@@ -4,6 +4,7 @@ import { simpleParser } from 'mailparser';
 import { supabase } from './supabase';
 import { parseX28Email } from './parser';
 
+
 export async function fetchAndProcessEmails() {
   const client = new ImapFlow({
     host: process.env.IMAP_HOST || 'imap.hostinger.com',
@@ -21,22 +22,23 @@ export async function fetchAndProcessEmails() {
     let lock = await client.getMailboxLock('INBOX');
     
     try {
-      // 1. Obtener todos los agentes para saber a quién pertenecen los mails reenviados
       const { data: agents } = await supabase.from('agents').select('id, email');
       if (!agents) throw new Error("No se pudieron cargar los agentes.");
 
-      // 2. Buscar mails no leídos
-      for await (let message of client.list({ seen: false }, { source: true })) {
+      // 1. Buscar UIDs de mails no leídos
+      let uids = await client.search({ seen: false });
+      
+      for (let uid of uids) {
+        // 2. Descargar el contenido del mail
+        let message = await client.fetchOne(uid.toString(), { source: true });
+        if (!message || !message.source) continue;
+
+        // @ts-ignore
         const parsed = await simpleParser(message.source);
         const bodyText = parsed.text || "";
         const subject = parsed.subject || "";
         
-        // 3. Identificar al Agente
-        // Buscamos el mail del agente en el cuerpo (cuando se reenvía, suele aparecer "To: agente@mail.com")
-        // O en los headers de entrega original si están disponibles
         let targetAgent = null;
-        
-        // Estrategia A: Buscar en el cuerpo del mensaje (Forwarded lines)
         for (const agent of agents) {
           if (bodyText.includes(agent.email) || subject.includes(agent.email)) {
             targetAgent = agent;
@@ -44,8 +46,8 @@ export async function fetchAndProcessEmails() {
           }
         }
         
-        // Estrategia B: Si no se encontró, buscar en el header 'to' o 'delivered-to' (por si acaso)
         if (!targetAgent) {
+           // @ts-ignore
            const toHeader = parsed.to?.text || "";
            for (const agent of agents) {
               if (toHeader.includes(agent.email)) {
@@ -57,27 +59,23 @@ export async function fetchAndProcessEmails() {
 
         if (targetAgent) {
           console.log(`Procesando mail para agente: ${targetAgent.email}`);
-          
-          // 4. Parsear el contenido de X-28
           const x28Data = parseX28Email(bodyText);
           
           if (x28Data.type !== "DESCONOCIDO") {
-             // Reutilizamos la lógica de inserción (aquí simplificada)
              await processX28Data(x28Data, targetAgent.id, bodyText);
           } else {
-             // Guardar como desconocido para debug si es necesario
              await supabase.from('events').insert({
                 agent_id: targetAgent.id,
                 event_type: "FORMATO_DESCONOCIDO",
                 priority: "GRIS",
-                description: `Mail recibido de ${parsed.from?.text} pero formato no reconocido.`,
+                description: `Mail de ${parsed.from?.text || 'Desconocido'} no reconocido.`,
                 raw_email_text: bodyText.substring(0, 1500)
              });
           }
         }
 
-        // Marcar como leído
-        await client.messageFlagsAdd(message.uid, ['\\Seen'], { uid: true });
+        // 3. Marcar como leído
+        await client.messageFlagsAdd(uid.toString(), ['\\Seen']);
       }
     } finally {
       lock.release();
@@ -91,6 +89,7 @@ export async function fetchAndProcessEmails() {
     throw error;
   }
 }
+
 
 async function processX28Data(parsed: any, agentId: string, rawText: string) {
     const eventsToProcess = [];
