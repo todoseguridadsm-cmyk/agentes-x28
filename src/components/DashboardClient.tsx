@@ -118,10 +118,14 @@ export default function DashboardClient({ agent, rojoItems, amarilloItems, azulI
                            <span className="text-[10px] text-slate-400 uppercase font-bold">{it.date}</span>
                            <button onClick={(e) => !isAzul ? handleDeleteEvent(it.id, e) : handleDeleteOrder(it.id, e)} className="text-red-400/50 hover:text-red-400 transition text-xs">✕</button>
                         </div>
+
                         <p className="text-sm text-slate-200 font-light leading-relaxed">
                            {it.description}
-                           {it.details && (it.details as any).zone && <span className="ml-2 text-slate-400 text-xs italic">({(it.details as any).zone})</span>}
+                           {it.details && typeof it.details === 'object' && 'zone' in it.details && (
+                             <span className="ml-2 text-slate-400 text-xs italic">({(it.details as any).zone})</span>
+                           )}
                         </p>
+
                         
                         {isAzul && !isCompleted && (
                           <div className="mt-3 flex gap-2">
