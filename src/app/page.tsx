@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/server";
+import { supabase } from "@/lib/supabase";
 import DashboardClient from "@/components/DashboardClient";
 
 export const revalidate = 0;
@@ -15,7 +15,6 @@ export default async function Home() {
     redirect("/login");
   }
 
-  const supabase = await createClient();
 
   // 1. Obtener el agente actual
   const { data: agent } = await supabase

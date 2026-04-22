@@ -4,8 +4,6 @@ import { supabase, supabaseAdmin } from "./supabase";
 import { cookies } from "next/headers";
 
 export async function loginAgentAction(email: string) {
-  // Para MVP simple por ahora, sólo nos basamos en el Email exacto.
-  // En producción usaríamos constraseña hasheada.
   const { data: agent, error } = await supabase
     .from("agents")
     .select("*")
@@ -16,7 +14,6 @@ export async function loginAgentAction(email: string) {
     return { error: "Cuenta no encontrada. Verifica tu correo o regístrate." };
   }
 
-  // Set the session cookie
   const cookieStore = await cookies();
   cookieStore.set("agent_id", agent.id, { 
      secure: process.env.NODE_ENV === "production", 
@@ -26,18 +23,12 @@ export async function loginAgentAction(email: string) {
 }
 
 export async function registerAgentAction(data: { email: string, firstName: string, lastName: string, phone: string }) {
-  // 1. Verificar si ya existe
   const { data: existing } = await supabase.from("agents").select("id").eq("email", data.email).single();
-  
-  if (existing) {
-    return { error: "Este correo ya está registrado." };
-  }
+  if (existing) return { error: "Este correo ya está registrado." };
 
-  // 2. Generar el webhook_token único
   const randomStr = Math.random().toString(36).substring(2, 10);
   const webhookToken = `webhook_xtoken_${randomStr}`;
 
-  // 3. Crear Agente
   const { data: newAgent, error } = await supabase.from("agents").insert({
      email: data.email,
      first_name: data.firstName,
@@ -46,11 +37,8 @@ export async function registerAgentAction(data: { email: string, firstName: stri
      webhook_token: webhookToken
   }).select("id").single();
 
-  if (error || !newAgent) {
-    return { error: "Falló la creación de cuenta en base de datos. Intenta nuevamente." };
-  }
+  if (error || !newAgent) return { error: "Falló la creación." };
 
-  // 4. Set Cookie Session
   const cookieStore = await cookies();
   cookieStore.set("agent_id", newAgent.id, { 
     secure: process.env.NODE_ENV === "production", 
@@ -75,13 +63,11 @@ export async function deleteOrder(orderId: string) {
   return { success: !error, error };
 }
 
-
 export async function deleteEvent(eventId: string) {
   const { error } = await supabaseAdmin.from("events").delete().eq("id", eventId);
   if (error) console.error("Error deleting event:", error);
   return { success: !error, error };
 }
-
 
 export async function deleteEventsByAccount(agentId: string, account: string) {
   const { error } = await supabaseAdmin.from("events").delete().eq("agent_id", agentId).eq("account_number", account);
@@ -89,7 +75,6 @@ export async function deleteEventsByAccount(agentId: string, account: string) {
 }
 
 export async function deleteOrdersByAccount(agentId: string, account: string) {
-  // Primero buscamos al cliente para obtener su ID
   const { data: customer } = await supabase
     .from("customers")
     .select("id")
@@ -107,6 +92,3 @@ export async function deleteOrdersByAccount(agentId: string, account: string) {
     
   return { success: !error, error };
 }
-
-
-
